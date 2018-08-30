@@ -43,7 +43,7 @@ namespace System.Linq.Dynamic.Core.Parser
         /// <param name="expression">The expression.</param>
         /// <param name="values">The values.</param>
         /// <param name="parsingConfig">The parsing configuration.</param>
-        public ExpressionParser([CanBeNull] ParameterExpression[] parameters, [NotNull] string expression, [CanBeNull] object[] values, [CanBeNull] ParsingConfig parsingConfig)
+        public ExpressionParser([CanBeNull] ParameterExpression[] parameters, [NotNull] string expression, [CanBeNull] object[] values, [CanBeNull] ParsingConfig parsingConfig, ParameterExpression it = null, ParameterExpression parent = null, ParameterExpression root = null)
         {
             Check.NotEmpty(expression, nameof(expression));
 
@@ -54,6 +54,13 @@ namespace System.Linq.Dynamic.Core.Parser
             {
                 ProcessParameters(parameters);
             }
+
+            if (it != null)
+                _it = it;
+            if (parent != null)
+                _parent = parent;
+            if (root != null)
+                _root = root;
 
             if (values != null)
             {
