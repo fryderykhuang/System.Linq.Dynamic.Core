@@ -961,17 +961,6 @@ namespace System.Linq.Dynamic.Core.Parser
             _textParser.NextToken();
             Expression e = ParseConditionalOperator();
             _textParser.ValidateToken(TokenId.CloseParen, Res.CloseParenOrOperatorExpected);
-
-            var constExp = e as ConstantExpression;
-            if (constExp != null && constExp.Value is Type)
-            {
-                _textParser.NextToken();
-                var nextExpression = ParseConditionalOperator();
-
-                // cast: (constExp)nextExpression
-                return Expression.Convert(nextExpression, (Type)constExp.Value);
-            }
-
             _textParser.NextToken();
             return e;
         }
@@ -1369,12 +1358,6 @@ namespace System.Linq.Dynamic.Core.Parser
 
                 type = typeof(Nullable<>).MakeGenericType(type);
                 _textParser.NextToken();
-            }
-
-
-            if (_textParser.CurrentToken.Id == TokenId.CloseParen)
-            {
-                return Expression.Constant(type);
             }
 
             // This is a shorthand for explicitely converting a string to something
