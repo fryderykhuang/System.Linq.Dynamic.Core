@@ -1,18 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Dynamic.Core.CustomTypeProviders;
+using System.Linq.Expressions;
+using System.Reflection;
 using ConsoleAppEF2.Database;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ConsoleAppEF2
 {
-    class Program
+    static class Program
     {
-        class C : AbstractDynamicLinqCustomTypeProvider, IDynamicLinkCustomTypeProvider
+        public class NestedDto
+        {
+            public string Name { get; set; }
+
+            public NestedDto2 NestedDto2 { get; set; }
+
+
+        }
+
+        public class NestedDto2
+        {
+            public string Name2 { get; set; }
+
+            public int Id { get; set; }
+        }
+
+        class NetCore21CustomTypeProvider : AbstractDynamicLinqCustomTypeProvider, IDynamicLinkCustomTypeProvider
         {
             public HashSet<Type> GetCustomTypes()
             {
@@ -25,24 +42,155 @@ namespace ConsoleAppEF2
 
                 return set;
             }
+
+            public Type ResolveType(string typeName)
+            {
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                return ResolveType(assemblies, typeName);
+            }
+        }
+
+        private static object GetObj()
+        {
+            return new
+            {
+                Id = 5,
+                Value = 400
+            };
+        }
+
+        class X : DynamicClass
+        {
+
         }
 
         private static IQueryable GetQueryable()
         {
             var random = new Random((int)DateTime.Now.Ticks);
 
+            var jt = typeof(JToken);
+
+            var em = jt.GetTypeInfo().GetDeclaredMethods("op_Explicit");
+            var im = jt.GetTypeInfo().GetDeclaredMethods("op_Explicit");
+
+            var j = new JObject
+            {
+                { "Id", new JValue(9) },
+                { "Name", new JValue("Test") }
+            };
+
+            //(j["Id"] as JValue).Value
+
+            IQueryable jarray = new[] { j }.AsQueryable();
+            var jresult = jarray.Select("new (int(Id) as Id, string(Name) as Name)");
+
+            var an = jresult.Any("Id > 4");
+
+
+            var dx = new X();
+            dx["Id"] = 5;
+
+            IQueryable srcDX = new[] { dx }.AsQueryable();
+            var b = srcDX.Select("new (Id.ToString() as Id)");
+            var anyDX = b.Any("int.Parse(Id) > 4");
+
             var x = Enumerable.Range(0, 10).Select(i => new
             {
                 Id = i,
-                Value = random.Next(),
-            });
+                Value = random.Next()
+            }).AsQueryable();
 
-            return x.AsQueryable().Select("new (it as Id, @0 as Value)", random.Next());
+            //var any = x.Any("Id > 4");
+
+            //var obj = new
+            //{
+            //    Id = 5,
+            //    Value = random.Next()
+            //};
+            //var x2 = Enumerable.Range(0, 1).Select(_ => obj).AsQueryable();
+            //var any2 = x.Any("Id > 4");
+
+            //var o = GetObj();
+            //var t = o.GetType();
+            //IQueryable source = new[] { o }.AsQueryable();
+            //// source.ElementType = t;
+
+            //var x2b = new[] { o }.AsQueryable();
+            //var any2function = x2b.Any(null, "Id > 4", t);
+
+            //var any2b = x2b.Any("Id > 4");
+
+            //var x3 = new[] { obj }.AsQueryable();
+            //var any3 = x3.Any("Id > 4");
+
+            return x.Select("new (it as Id, @0 as Value)", random.Next());
             // return x.AsQueryable(); //x.AsQueryable().Select("new (Id, Value)");
+        }
+
+        public static IQueryable Transform(this IQueryable source, Type resultType)
+        {
+            var resultProperties = resultType.GetProperties().Where(p => p.CanWrite);
+
+            ParameterExpression s = Expression.Parameter(source.ElementType, "s");
+
+            var memberBindings =
+                resultProperties.Select(p =>
+                    Expression.Bind(resultType.GetMember(p.Name)[0], Expression.Property(s, p.Name))).OfType<MemberBinding>();
+
+            Expression memberInit = Expression.MemberInit(
+                Expression.New(resultType),
+                memberBindings
+            );
+
+            var memberInitLambda = Expression.Lambda(memberInit, s);
+
+            var typeArgs = new[]
+            {
+                source.ElementType,
+                memberInit.Type
+            };
+
+            var mc = Expression.Call(typeof(Queryable), "Select", typeArgs, source.Expression, memberInitLambda);
+
+            var query = source.Provider.CreateQuery(mc);
+
+            return query;
+        }
+
+        public static IQueryable<T> EmptyQueryByExample<T>(this T _) => Enumerable.Empty<T>().AsQueryable();
+
+
+        private static TResult Execute<TResult>(MethodInfo operatorMethodInfo, IQueryable source, Expression expression, Type t = null)
+        {
+            operatorMethodInfo = operatorMethodInfo.GetGenericArguments().Length == 2
+                ? operatorMethodInfo.MakeGenericMethod(t == null ? source.ElementType : t, typeof(TResult))
+                : operatorMethodInfo.MakeGenericMethod(t == null ? source.ElementType : t);
+
+            var optimized = Expression.Call(null, operatorMethodInfo, source.Expression, expression);
+            return source.Provider.Execute<TResult>(optimized);
         }
 
         static void Main(string[] args)
         {
+            var q = new[] { new NestedDto(), new NestedDto { NestedDto2 = new NestedDto2 { Id = 42 } } }.AsQueryable();
+            var r1 = q.Select("it != null && it.NestedDto2 != null ? it.NestedDto2.Id : null");
+            var list1 = r1.ToDynamicList<int?>();
+
+            var r2 = q.Select("it != null && it.NestedDto2 != null ? it.NestedDto2 : null");
+            var list2 = r2.ToDynamicList<NestedDto2>();
+
+            var config = new ParsingConfig
+            {
+                AllowNewToEvaluateAnyType = true,
+                CustomTypeProvider = new NetCore21CustomTypeProvider()
+            };
+
+            // Act
+            var testDataAsQueryable = new List<string>() { "name1", "name2" }.AsQueryable();
+            var projectedData = (IQueryable<NestedDto>)testDataAsQueryable.Select(config, $"new {typeof(NestedDto).FullName}(~ as Name)");
+            Console.WriteLine(projectedData.First().Name);
+            Console.WriteLine(projectedData.Last().Name);
+
             IQueryable qry = GetQueryable();
 
             var result = qry.Select("it").OrderBy("Value");
@@ -63,7 +211,7 @@ namespace ConsoleAppEF2
             };
             Console.WriteLine("all {0}", JsonConvert.SerializeObject(all, Formatting.Indented));
 
-            var anyTest = new []
+            var anyTest = new[]
             {
                 new { id = "1", values =new [] { 1, 2, 3 } },
                 new { id = "2", values =new [] { 1, 4 } },
@@ -76,10 +224,7 @@ namespace ConsoleAppEF2
             var any2 = anyTest.Where("values.Contains(1)");
             Console.WriteLine("any2 {0}", JsonConvert.SerializeObject(any2, Formatting.Indented));
 
-            var config = new ParsingConfig
-            {
-                CustomTypeProvider = new C()
-            };
+
 
             var dateLastModified = new DateTime(2018, 1, 15);
 
@@ -88,6 +233,11 @@ namespace ConsoleAppEF2
             context.Cars.Add(new Car { Brand = "Fiat", Color = "Red", Vin = "yes", Year = "2016", DateLastModified = dateLastModified.AddDays(1) });
             context.Cars.Add(new Car { Brand = "Alfa", Color = "Black", Vin = "no", Year = "1979", DateLastModified = dateLastModified.AddDays(2) });
             context.Cars.Add(new Car { Brand = "Alfa", Color = "Black", Vin = "a%bc", Year = "1979", DateLastModified = dateLastModified.AddDays(3) });
+            context.SaveChanges();
+
+            context.Brands.Add(new Brand { BrandType = "Ford", BrandName = "Fiesta" });
+            context.Brands.Add(new Brand { BrandType = "Fiat", BrandName = "Panda" });
+            context.Brands.Add(new Brand { BrandType = "Alfa", BrandName = "Romeo" });
             context.SaveChanges();
 
             var carDateLastModified = context.Cars.Where(config, "DateLastModified > \"2018-01-16\"");

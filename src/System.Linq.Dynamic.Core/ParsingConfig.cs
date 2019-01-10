@@ -1,9 +1,10 @@
 ﻿using System.Linq.Dynamic.Core.CustomTypeProviders;
+using System.Linq.Dynamic.Core.Parser;
 
 namespace System.Linq.Dynamic.Core
 {
     /// <summary>
-    /// Configuration class for Dynamic Linq.
+    /// Configuration class for System.Linq.Dynamic.Core.
     /// </summary>
     public class ParsingConfig
     {
@@ -22,6 +23,10 @@ namespace System.Linq.Dynamic.Core
 
         private IDynamicLinkCustomTypeProvider _customTypeProvider;
 
+        private IExpressionPromoter _expressionPromoter;
+
+        private IQueryableAnalyzer _queryableAnalyzer;
+
         /// <summary>
         /// Gets or sets the <see cref="IDynamicLinkCustomTypeProvider"/>.
         /// </summary>
@@ -30,7 +35,7 @@ namespace System.Linq.Dynamic.Core
             get
             {
 #if !(DOTNET5_1 || WINDOWS_APP || UAP10_0 || NETSTANDARD)
-                // only use DefaultDynamicLinqCustomTypeProvider if not WINDOWS_APP || UAP10_0 || NETSTANDARD
+                // only use DefaultDynamicLinqCustomTypeProvider for full .NET Framework
                 return _customTypeProvider ?? (_customTypeProvider = new DefaultDynamicLinqCustomTypeProvider());
 #else
                 return _customTypeProvider;
@@ -47,20 +52,84 @@ namespace System.Linq.Dynamic.Core
         }
 
         /// <summary>
+        /// Gets or sets the <see cref="IExpressionPromoter"/>.
+        /// </summary>
+        public IExpressionPromoter ExpressionPromoter
+        {
+            get
+            {
+                return _expressionPromoter ?? (_expressionPromoter = new ExpressionPromoter());
+            }
+
+            set
+            {
+                if (_expressionPromoter != value)
+                {
+                    _expressionPromoter = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the <see cref="IQueryableAnalyzer"/>.
+        /// </summary>
+        public IQueryableAnalyzer QueryableAnalyzer
+        {
+            get
+            {
+                return _queryableAnalyzer ?? (_queryableAnalyzer = new DefaultQueryableAnalyzer());
+            }
+
+            set
+            {
+                if (_queryableAnalyzer != value)
+                {
+                    _queryableAnalyzer = value;
+                }
+            }
+        }
+
+        /// <summary>
         /// Determines if the context keywords (it, parent, and root) are valid and usable inside a Dynamic Linq string expression.  
         /// Does not affect the usability of the equivalent context symbols ($, ^ and ~).
+        /// Default value is true.
         /// </summary>
         public bool AreContextKeywordsEnabled { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets a value indicating whether to use dynamic object class for anonymous types.
+        /// Gets or sets a value indicating whether to use dynamic object class for anonymous types. Default value is false.
         /// </summary>
-        public bool UseDynamicObjectClassForAnonymousTypes { get; set; }
+        public bool UseDynamicObjectClassForAnonymousTypes { get; set; } = false;
 
         /// <summary>
-        /// Gets or sets a value indicating whether the EntityFramwwork version supports evaluating GroupBy at database level.
+        /// Gets or sets a value indicating whether the EntityFramework version supports evaluating GroupBy at database level. Default value is false.
         /// See https://docs.microsoft.com/en-us/ef/core/what-is-new/ef-core-2.1#linq-groupby-translation
+        /// 
+        /// Remark: when this setting is set to 'true', make sure to supply this ParsingConfig as first parameter on the extension methods.
         /// </summary>
-        public bool EvaluateGroupByAtDatabase { get; set; }
+        public bool EvaluateGroupByAtDatabase { get; set; } = false;
+
+        /// <summary>
+        /// Use Parameterized Names in generated dynamic SQL query. Default set to false.
+        /// See https://github.com/graeme-hill/gblog/blob/master/source_content/articles/2014.139_entity-framework-dynamic-queries-and-parameterization.mkd
+        /// </summary>
+        public bool UseParameterizedNamesInDynamicQuery { get; set; } = false;
+
+        /// <summary>
+        /// Allows the New() keyword to evaluate any available Type. Default value is false.
+        /// </summary>
+        public bool AllowNewToEvaluateAnyType { get; set; } = false;
+
+        /// <summary>
+        /// Renames the (Typed)ParameterExpression empty Name to a the correct supplied name from `it`. Default value is false.
+        /// </summary>
+        public bool RenameParameterExpression { get; set; } = false;
+
+        /// <summary>
+        /// By default when a member is not found in a type and the type has a string based index accessor it will be parsed as an index accessor. Use
+        /// this flag to disable this behaviour and have parsing fail when parsing an expression
+        /// where a member access on a non existing member happens. Default value is false.
+        /// </summary>
+        public bool DisableMemberAccessToIndexAccessorFallback { get; set; } = false;
     }
 }

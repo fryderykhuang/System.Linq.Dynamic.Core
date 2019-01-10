@@ -1,34 +1,63 @@
-﻿#if !(WINDOWS_APP || UAP10_0)
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq.Dynamic.Core.Validation;
 using System.Reflection;
 
 namespace System.Linq.Dynamic.Core.CustomTypeProviders
 {
     /// <summary>
-    /// The default <see cref="IDynamicLinkCustomTypeProvider"/>. Scans the current AppDomain for all types marked with <see cref="DynamicLinqTypeAttribute"/>, and adds them as custom Dynamic Link types.
+    /// The default implementation for <see cref="IDynamicLinkCustomTypeProvider"/>.
+    /// 
+    /// Scans the current AppDomain for all types marked with <see cref="DynamicLinqTypeAttribute"/>, and adds them as custom Dynamic Link types.
+    ///
+    /// Also provides functionality to resolve a Type in the current Application Domain.
+    ///
+    /// This class is used as default for full .NET Framework, so not for .NET Core
     /// </summary>
     public class DefaultDynamicLinqCustomTypeProvider : AbstractDynamicLinqCustomTypeProvider, IDynamicLinkCustomTypeProvider
     {
         private readonly IAssemblyHelper _assemblyHelper = new DefaultAssemblyHelper();
-        private HashSet<Type> _customTypes;
+        private readonly bool _cacheCustomTypes;
+
+        private HashSet<Type> _cachedCustomTypes;
 
         /// <summary>
-        /// Returns a list of custom types that System.Linq.Dynamic.Core will understand.
+        /// Initializes a new instance of the <see cref="DefaultDynamicLinqCustomTypeProvider"/> class.
         /// </summary>
-        /// <returns>
-        /// A <see cref="System.Collections.Generic.HashSet&lt;Type&gt;" /> list of custom types.
-        /// </returns>
+        /// <param name="cacheCustomTypes">Defines whether to cache the CustomTypes which are found in the Application Domain. Default set to 'true'.</param>
+        public DefaultDynamicLinqCustomTypeProvider(bool cacheCustomTypes = true)
+        {
+            _cacheCustomTypes = cacheCustomTypes;
+        }
+
+        /// <inheritdoc cref="IDynamicLinkCustomTypeProvider.GetCustomTypes"/>
         public virtual HashSet<Type> GetCustomTypes()
         {
-            if (_customTypes != null)
+            if (_cacheCustomTypes)
             {
-                return _customTypes;
+                if (_cachedCustomTypes == null)
+                {
+                    _cachedCustomTypes = GetCustomTypesInternal();
+                }
+
+                return _cachedCustomTypes;
             }
 
+            return GetCustomTypesInternal();
+        }
+
+        /// <inheritdoc cref="IDynamicLinkCustomTypeProvider.ResolveType"/>
+        public Type ResolveType(string typeName)
+        {
+            Check.NotEmpty(typeName, nameof(typeName));
+
             IEnumerable<Assembly> assemblies = _assemblyHelper.GetAssemblies();
-            _customTypes = new HashSet<Type>(FindTypesMarkedWithDynamicLinqTypeAttribute(assemblies));
-            return _customTypes;
+            return ResolveType(assemblies, typeName);
+        }
+
+        private HashSet<Type> GetCustomTypesInternal()
+        {
+            IEnumerable<Assembly> assemblies = _assemblyHelper.GetAssemblies();
+            return new HashSet<Type>(FindTypesMarkedWithDynamicLinqTypeAttribute(assemblies));
         }
     }
 }
-#endif
