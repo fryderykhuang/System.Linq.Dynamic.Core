@@ -1,13 +1,10 @@
-﻿using System;
+﻿using ConsoleAppEF2.Database;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Dynamic.Core.CustomTypeProviders;
-using System.Linq.Expressions;
-using System.Reflection;
-using ConsoleAppEF2.Database;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace ConsoleAppEF2
 {
@@ -18,8 +15,6 @@ namespace ConsoleAppEF2
             public string Name { get; set; }
 
             public NestedDto2 NestedDto2 { get; set; }
-
-
         }
 
         public class NestedDto2
@@ -27,11 +22,19 @@ namespace ConsoleAppEF2
             public string Name2 { get; set; }
 
             public int Id { get; set; }
+            public NestedDto3 NestedDto3 { get; set; }
         }
 
-        class NetCore21CustomTypeProvider : AbstractDynamicLinqCustomTypeProvider, IDynamicLinkCustomTypeProvider
+        public class NestedDto3
         {
-            public HashSet<Type> GetCustomTypes()
+            public string Name2 { get; set; }
+
+            public int Id { get; set; }
+        }
+
+        class TestCustomTypeProvider : DefaultDynamicLinqCustomTypeProvider, IDynamicLinkCustomTypeProvider
+        {
+            public new HashSet<Type> GetCustomTypes()
             {
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
@@ -42,191 +45,60 @@ namespace ConsoleAppEF2
 
                 return set;
             }
-
-            public Type ResolveType(string typeName)
-            {
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                return ResolveType(assemblies, typeName);
-            }
-        }
-
-        private static object GetObj()
-        {
-            return new
-            {
-                Id = 5,
-                Value = 400
-            };
-        }
-
-        class X : DynamicClass
-        {
-
-        }
-
-        private static IQueryable GetQueryable()
-        {
-            var random = new Random((int)DateTime.Now.Ticks);
-
-            var jt = typeof(JToken);
-
-            var em = jt.GetTypeInfo().GetDeclaredMethods("op_Explicit");
-            var im = jt.GetTypeInfo().GetDeclaredMethods("op_Explicit");
-
-            var j = new JObject
-            {
-                { "Id", new JValue(9) },
-                { "Name", new JValue("Test") }
-            };
-
-            //(j["Id"] as JValue).Value
-
-            IQueryable jarray = new[] { j }.AsQueryable();
-            var jresult = jarray.Select("new (int(Id) as Id, string(Name) as Name)");
-
-            var an = jresult.Any("Id > 4");
-
-
-            var dx = new X();
-            dx["Id"] = 5;
-
-            IQueryable srcDX = new[] { dx }.AsQueryable();
-            var b = srcDX.Select("new (Id.ToString() as Id)");
-            var anyDX = b.Any("int.Parse(Id) > 4");
-
-            var x = Enumerable.Range(0, 10).Select(i => new
-            {
-                Id = i,
-                Value = random.Next()
-            }).AsQueryable();
-
-            //var any = x.Any("Id > 4");
-
-            //var obj = new
-            //{
-            //    Id = 5,
-            //    Value = random.Next()
-            //};
-            //var x2 = Enumerable.Range(0, 1).Select(_ => obj).AsQueryable();
-            //var any2 = x.Any("Id > 4");
-
-            //var o = GetObj();
-            //var t = o.GetType();
-            //IQueryable source = new[] { o }.AsQueryable();
-            //// source.ElementType = t;
-
-            //var x2b = new[] { o }.AsQueryable();
-            //var any2function = x2b.Any(null, "Id > 4", t);
-
-            //var any2b = x2b.Any("Id > 4");
-
-            //var x3 = new[] { obj }.AsQueryable();
-            //var any3 = x3.Any("Id > 4");
-
-            return x.Select("new (it as Id, @0 as Value)", random.Next());
-            // return x.AsQueryable(); //x.AsQueryable().Select("new (Id, Value)");
-        }
-
-        public static IQueryable Transform(this IQueryable source, Type resultType)
-        {
-            var resultProperties = resultType.GetProperties().Where(p => p.CanWrite);
-
-            ParameterExpression s = Expression.Parameter(source.ElementType, "s");
-
-            var memberBindings =
-                resultProperties.Select(p =>
-                    Expression.Bind(resultType.GetMember(p.Name)[0], Expression.Property(s, p.Name))).OfType<MemberBinding>();
-
-            Expression memberInit = Expression.MemberInit(
-                Expression.New(resultType),
-                memberBindings
-            );
-
-            var memberInitLambda = Expression.Lambda(memberInit, s);
-
-            var typeArgs = new[]
-            {
-                source.ElementType,
-                memberInit.Type
-            };
-
-            var mc = Expression.Call(typeof(Queryable), "Select", typeArgs, source.Expression, memberInitLambda);
-
-            var query = source.Provider.CreateQuery(mc);
-
-            return query;
-        }
-
-        public static IQueryable<T> EmptyQueryByExample<T>(this T _) => Enumerable.Empty<T>().AsQueryable();
-
-
-        private static TResult Execute<TResult>(MethodInfo operatorMethodInfo, IQueryable source, Expression expression, Type t = null)
-        {
-            operatorMethodInfo = operatorMethodInfo.GetGenericArguments().Length == 2
-                ? operatorMethodInfo.MakeGenericMethod(t == null ? source.ElementType : t, typeof(TResult))
-                : operatorMethodInfo.MakeGenericMethod(t == null ? source.ElementType : t);
-
-            var optimized = Expression.Call(null, operatorMethodInfo, source.Expression, expression);
-            return source.Provider.Execute<TResult>(optimized);
         }
 
         static void Main(string[] args)
         {
-            var q = new[] { new NestedDto(), new NestedDto { NestedDto2 = new NestedDto2 { Id = 42 } } }.AsQueryable();
-            var r1 = q.Select("it != null && it.NestedDto2 != null ? it.NestedDto2.Id : null");
-            var list1 = r1.ToDynamicList<int?>();
+            //var q = new[] { new NestedDto(), new NestedDto { NestedDto2 = new NestedDto2 { NestedDto3 = new NestedDto3 { Id = 42 } } } }.AsQueryable();
 
-            var r2 = q.Select("it != null && it.NestedDto2 != null ? it.NestedDto2 : null");
-            var list2 = r2.ToDynamicList<NestedDto2>();
+            //var np1 = q.Select("np(it.NestedDto2.NestedDto3.Id, 0)");
+            //var npResult1 = np1.ToDynamicList<int>();
+            //Console.WriteLine("npResult1 {0}", JsonConvert.SerializeObject(npResult1, Formatting.Indented));
+
+            //var np2 = q.Select("np(it.NestedDto2.NestedDto3.Id)");
+            //var npResult2 = np2.ToDynamicList<int?>();
+            //Console.WriteLine("npResult2 {0}", JsonConvert.SerializeObject(npResult2, Formatting.Indented));
+
+            //var r1 = q.Select("it != null && it.NestedDto2 != null ? it.NestedDto2.Id : null");
+            //var list1 = r1.ToDynamicList<int?>();
+
+            //var r2 = q.Select("it != null && it.NestedDto2 != null ? it.NestedDto2 : null");
+            //var list2 = r2.ToDynamicList<NestedDto2>();
 
             var config = new ParsingConfig
             {
                 AllowNewToEvaluateAnyType = true,
-                CustomTypeProvider = new NetCore21CustomTypeProvider()
+                CustomTypeProvider = new TestCustomTypeProvider()
             };
 
-            // Act
-            var testDataAsQueryable = new List<string>() { "name1", "name2" }.AsQueryable();
-            var projectedData = (IQueryable<NestedDto>)testDataAsQueryable.Select(config, $"new {typeof(NestedDto).FullName}(~ as Name)");
-            Console.WriteLine(projectedData.First().Name);
-            Console.WriteLine(projectedData.Last().Name);
+            //// Act
+            //var testDataAsQueryable = new List<string> { "name1", "name2" }.AsQueryable();
+            //var projectedData = (IQueryable<NestedDto>)testDataAsQueryable.Select(config, $"new {typeof(NestedDto).FullName}(~ as Name)");
+            //Console.WriteLine(projectedData.First().Name);
+            //Console.WriteLine(projectedData.Last().Name);
 
-            IQueryable qry = GetQueryable();
+            //var all = new
+            //{
+            //    test1 = new List<int> { 1, 2, 3 }.ToDynamicList(typeof(int)),
+            //    test2 = new List<dynamic> { 4, 5, 6 }.ToDynamicList(typeof(int)),
+            //    test3 = new List<object> { 7, 8, 9 }.ToDynamicList(typeof(int))
+            //};
+            //Console.WriteLine("all {0}", JsonConvert.SerializeObject(all, Formatting.Indented));
 
-            var result = qry.Select("it").OrderBy("Value");
-            try
-            {
-                Console.WriteLine("result {0}", JsonConvert.SerializeObject(result, Formatting.Indented));
-            }
-            catch (Exception)
-            {
-                // Console.WriteLine(e);
-            }
+            //var anyTest = new[]
+            //{
+            //    new { id = "1", values =new [] { 1, 2, 3 } },
+            //    new { id = "2", values =new [] { 1, 4 } },
+            //    new { id = "3", values =new [] { 9, 5 } }
+            //}.AsQueryable();
 
-            var all = new
-            {
-                test1 = new List<int> { 1, 2, 3 }.ToDynamicList(typeof(int)),
-                test2 = new List<dynamic> { 4, 5, 6 }.ToDynamicList(typeof(int)),
-                test3 = new List<object> { 7, 8, 9 }.ToDynamicList(typeof(int))
-            };
-            Console.WriteLine("all {0}", JsonConvert.SerializeObject(all, Formatting.Indented));
+            //var any1 = anyTest.Where(x => x.values.Contains(1));
+            //Console.WriteLine("any1 {0}", JsonConvert.SerializeObject(any1, Formatting.Indented));
 
-            var anyTest = new[]
-            {
-                new { id = "1", values =new [] { 1, 2, 3 } },
-                new { id = "2", values =new [] { 1, 4 } },
-                new { id = "3", values =new [] { 9, 5 } }
-            }.AsQueryable();
+            //var any2 = anyTest.Where("values.Contains(1)");
+            //Console.WriteLine("any2 {0}", JsonConvert.SerializeObject(any2, Formatting.Indented));
 
-            var any1 = anyTest.Where(x => x.values.Contains(1));
-            Console.WriteLine("any1 {0}", JsonConvert.SerializeObject(any1, Formatting.Indented));
-
-            var any2 = anyTest.Where("values.Contains(1)");
-            Console.WriteLine("any2 {0}", JsonConvert.SerializeObject(any2, Formatting.Indented));
-
-
-
-            var dateLastModified = new DateTime(2018, 1, 15);
+            DateTime dateLastModified = new DateTime(2018, 1, 15);
 
             var context = new TestContext();
             context.Cars.Add(new Car { Brand = "Ford", Color = "Blue", Vin = "yes", Year = "2017", DateLastModified = dateLastModified });
@@ -240,12 +112,48 @@ namespace ConsoleAppEF2
             context.Brands.Add(new Brand { BrandType = "Alfa", BrandName = "Romeo" });
             context.SaveChanges();
 
+            var testDto1 = new TestDto { BaseName = "a", Name = "t" };
+            context.BaseDtos.Add(testDto1);
+            var testDto2 = new TestDto { BaseName = "b", Name = "t" };
+            context.BaseDtos.Add(testDto2);
+
+            var otherTestDto = new OtherTestDto { BaseName = "c", Name = "t" };
+            context.BaseDtos.Add(otherTestDto);
+            context.SaveChanges();
+
+            context.ComplexDtos.Add(new ComplexDto { X = "both", ListOfBaseDtos = new BaseDto[] { testDto1, otherTestDto } });
+            context.ComplexDtos.Add(new ComplexDto { X = "testDto", ListOfBaseDtos = new BaseDto[] { testDto2 } });
+            context.SaveChanges();
+
+            OfTypeAndCastTests(context, config);
+
             var carDateLastModified = context.Cars.Where(config, "DateLastModified > \"2018-01-16\"");
             Console.WriteLine("carDateLastModified {0}", JsonConvert.SerializeObject(carDateLastModified, Formatting.Indented));
 
-            //var carFirstOrDefault = context.Cars.Where(config, "Brand == \"Ford\"");
-            //Console.WriteLine("carFirstOrDefault {0}", JsonConvert.SerializeObject(carFirstOrDefault, Formatting.Indented));
+            var carFirstOrDefault = context.Cars.Where(config, "Brand == \"Ford\"");
+            Console.WriteLine("carFirstOrDefault {0}", JsonConvert.SerializeObject(carFirstOrDefault, Formatting.Indented));
 
+            LikeTests(context, config);
+
+            var testDynamic = context.Cars.Select(c => new
+            {
+                K = c.Key,
+                C = c.Color
+            });
+
+            var testDynamicResult = testDynamic.Select("it").OrderBy("C");
+            try
+            {
+                Console.WriteLine("resultX {0}", JsonConvert.SerializeObject(testDynamicResult, Formatting.Indented));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+        }
+
+        private static void LikeTests(TestContext context, ParsingConfig config)
+        {
             //var carsLike1 =
             //    from c in context.Cars
             //    where EF.Functions.Like(c.Brand, "%a%")
@@ -255,33 +163,66 @@ namespace ConsoleAppEF2
             //var cars2Like = context.Cars.Where(c => EF.Functions.Like(c.Brand, "%a%"));
             //Console.WriteLine("cars2Like {0}", JsonConvert.SerializeObject(cars2Like, Formatting.Indented));
 
-            //var dynamicCarsLike1 = context.Cars.Where(config, "TestContext.Like(Brand, \"%a%\")");
-            //Console.WriteLine("dynamicCarsLike1 {0}", JsonConvert.SerializeObject(dynamicCarsLike1, Formatting.Indented));
+            var dynamicCarsLike1 = context.Cars.Where(config, "TestContext.Like(Brand, \"%a%\")");
+            Console.WriteLine("dynamicCarsLike1 {0}", JsonConvert.SerializeObject(dynamicCarsLike1, Formatting.Indented));
 
-            //var dynamicCarsLike2 = context.Cars.Where(config, "TestContext.Like(Brand, \"%d%\")");
-            //Console.WriteLine("dynamicCarsLike2 {0}", JsonConvert.SerializeObject(dynamicCarsLike2, Formatting.Indented));
+            var dynamicCarsLike2 = context.Cars.Where(config, "TestContext.Like(Brand, \"%d%\")");
+            Console.WriteLine("dynamicCarsLike2 {0}", JsonConvert.SerializeObject(dynamicCarsLike2, Formatting.Indented));
 
             //var dynamicFunctionsLike1 = context.Cars.Where(config, "DynamicFunctions.Like(Brand, \"%a%\")");
-            //Console.WriteLine("dynamicFunctionsLike1 {0}", JsonConvert.SerializeObject(dynamicFunctionsLike1, Formatting.Indented));
+            //Console.WriteLine("dynamicFunctionsLike1 {0}",
+            //JsonConvert.SerializeObject(dynamicFunctionsLike1, Formatting.Indented));
 
             //var dynamicFunctionsLike2 = context.Cars.Where(config, "DynamicFunctions.Like(Vin, \"%a.%b%\", \".\")");
-            //Console.WriteLine("dynamicFunctionsLike2 {0}", JsonConvert.SerializeObject(dynamicFunctionsLike2, Formatting.Indented));
+            //Console.WriteLine("dynamicFunctionsLike2 {0}",
+            //JsonConvert.SerializeObject(dynamicFunctionsLike2, Formatting.Indented));
+        }
 
-            //var testDynamic = context.Cars.Select(c => new
-            //{
-            //    K = c.Key,
-            //    C = c.Color
-            //});
+        private static void OfTypeAndCastTests(TestContext context, ParsingConfig config)
+        {
+            var cast = context.BaseDtos.Where(b => b is TestDto).Cast<TestDto>().ToArray();
+            var castDynamicWithType = context.BaseDtos.Where(b => b is TestDto).Cast(typeof(TestDto)).ToDynamicArray();
+            var castDynamicWithString = context.BaseDtos.Where(b => b is TestDto).Cast(config, "ConsoleAppEF2.Database.TestDto").ToDynamicArray();
 
-            //var testDynamicResult = testDynamic.Select("it").OrderBy("C");
-            //try
-            //{
-            //    Console.WriteLine("resultX {0}", JsonConvert.SerializeObject(testDynamicResult, Formatting.Indented));
-            //}
-            //catch (Exception e)
-            //{
-            //    Console.WriteLine(e);
-            //}
+            var oftype = context.BaseDtos.OfType<TestDto>().ToArray();
+            bool ofTypeAny = context.BaseDtos.OfType<TestDto>().Any();
+            var oftypeDynamicWithType = context.BaseDtos.OfType(typeof(TestDto)).ToDynamicArray();
+            var oftypeDynamicWithString = context.BaseDtos.OfType(config, "ConsoleAppEF2.Database.TestDto").ToDynamicArray();
+
+            var configX = new ParsingConfig
+            {
+                ResolveTypesBySimpleName = true
+            };
+            var oftypeDynamicWithSimpleNameString = context.BaseDtos.OfType(configX, "TestDto").ToDynamicArray();
+
+            int isOfType = context.BaseDtos.Count(b => b is TestDto);
+            int isOfTypeDynamicTestDto = context.BaseDtos.Count(config, "is(\"ConsoleAppEF2.Database.TestDto\")");
+            int isOfTypeDynamicOtherTestDto = context.BaseDtos.Count(config, "is(\"ConsoleAppEF2.Database.OtherTestDto\")");
+            int isOfTypeDynamicComplexDto = context.BaseDtos.Count(config, "is(\"ConsoleAppEF2.Database.ComplexDto\")");
+
+            var asOfType = context.BaseDtos.Where(b => b as TestDto != null).ToArray();
+            var asOfTypeDynamicTestDto = context.BaseDtos.Where(config, "As(\"ConsoleAppEF2.Database.TestDto\") != null").ToDynamicArray();
+            var asOfTypeDynamicOtherTestDto = context.BaseDtos.Where(config, "As(\"ConsoleAppEF2.Database.OtherTestDto\") != null").ToDynamicArray();
+            var asOfTypeDynamicComplexDto = context.BaseDtos.Where(config, "As(\"ConsoleAppEF2.Database.ComplexDto\") != null").ToDynamicArray();
+
+            var castOnX = context.BaseDtos.Where(b => b as TestDto != null).Where(b => ((TestDto)b).Name != null).ToArray();
+            var castOnXDynamic = context.BaseDtos.Where(b => b as TestDto != null).Where(config, "Cast(\"ConsoleAppEF2.Database.TestDto\").Name != null").ToArray();
+
+            var oftypeTestDto = context.BaseDtos.OfType<TestDto>().Where(x => x.Name == "t").ToArray();
+            var oftypeTestDtoDynamic = context.BaseDtos.OfType<TestDto>().Where("Name == \"t\"").ToArray();
+
+            var complexOfType = context.ComplexDtos.Select(c => c.ListOfBaseDtos.OfType<TestDto>().Where(x => x.Name == "t"))
+                .ToArray();
+            var complexOfTypeDynamic = context.ComplexDtos
+                .Select(config, "ListOfBaseDtos.OfType(\"ConsoleAppEF2.Database.TestDto\").Where(Name == \"t\")")
+                .ToDynamicArray();
+
+            var complexCast = context.ComplexDtos.Where(c => c.X == "testDto").ToList()
+                .Select(c => c.ListOfBaseDtos.Cast<TestDto>().Where(x => x.Name == "t"))
+                .ToArray();
+            var complexCastDynamic = context.ComplexDtos.Where(c => c.X == "testDto").ToList().AsQueryable()
+                .Select(config, "ListOfBaseDtos.Cast(\"ConsoleAppEF2.Database.TestDto\").Where(Name == \"t\")")
+                .ToDynamicArray();
         }
     }
 }

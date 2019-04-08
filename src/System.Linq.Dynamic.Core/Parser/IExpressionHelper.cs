@@ -27,5 +27,9 @@ namespace System.Linq.Dynamic.Core.Parser
         void OptimizeForEqualityIfPossible(ref Expression left, ref Expression right);
 
         Expression OptimizeStringForEqualityIfPossible(string text, Type type);
+
+        Expression GenerateAndAlsoNotNullExpression(Expression sourceExpression);
+
+        void WrapConstantExpression(ref Expression argument);
     }
 }

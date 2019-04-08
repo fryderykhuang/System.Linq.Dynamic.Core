@@ -270,7 +270,7 @@ namespace System.Linq.Dynamic.Core.Tests
         {
             var config = new ParsingConfig { AllowNewToEvaluateAnyType = true };
 #if NETCOREAPP
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
+            // config.CustomTypeProvider = new NetStandardCustomTypeProvider();
 #endif
             // Assign
             var queryable = new List<string>() { "name1", "name2" }.AsQueryable();
@@ -288,7 +288,7 @@ namespace System.Linq.Dynamic.Core.Tests
         {
             var config = new ParsingConfig { AllowNewToEvaluateAnyType = true };
 #if NETCOREAPP
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
+            // config.CustomTypeProvider = new NetStandardCustomTypeProvider();
 #endif
 
             // Assign
@@ -334,6 +334,19 @@ namespace System.Linq.Dynamic.Core.Tests
 
             // Assert
             Check.That(result).Equals("System.Int32[].Select(it => (it * it))");
+        }
+
+        [Fact]
+        public void Select_Dynamic_ReservedKeyword()
+        {
+            // Arrange
+            var queryable = new[] { new { Id = 1, Guid = "a" } }.AsQueryable();
+
+            // Act
+            var result = queryable.Select("new (Id, @Guid, 42 as Answer)").ToDynamicArray();
+
+            // Assert
+            Check.That(result).IsNotNull();
         }
 
         [Fact]

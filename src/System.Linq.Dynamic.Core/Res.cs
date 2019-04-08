@@ -22,6 +22,8 @@
         public const string ExpressionExpected = "Expression expected";
         public const string ExpressionTypeMismatch = "Expression of type '{0}' expected";
         public const string FirstExprMustBeBool = "The first expression must be of type 'Boolean'";
+        public const string FunctionRequiresOneArg = "The '{0}' function requires one argument";
+        public const string FunctionRequiresOneNotNullArg = "The '{0}' function requires one argument which is not null.";
         public const string HexCharExpected = "Hexadecimal character expected";
         public const string IQueryableProviderNotAsync = "The provider for the source IQueryable doesn't implement IAsyncQueryProvider/IDbAsyncQueryProvider. Only providers that implement IAsyncQueryProvider/IDbAsyncQueryProvider can be used for Entity Framework asynchronous operations.";
         public const string IdentifierExpected = "Identifier expected";
@@ -49,6 +51,8 @@
         public const string NoMatchingConstructor = "No matching constructor in type '{0}'";
         public const string NoParentInScope = "No 'parent' is in scope";
         public const string NoRootInScope = "No 'root' is in scope";
+        public const string NullPropagationRequiresCorrectArgs = "The 'np' (null-propagation) function requires 1 or 2 arguments";
+        public const string NullPropagationRequiresMemberExpression = "The 'np' (null-propagation) function requires the first argument to be a MemberExpression";
         public const string OpenBracketExpected = "'[' expected";
         public const string OpenCurlyParenExpected = "'{' expected";
         public const string OpenParenExpected = "'(' expected";

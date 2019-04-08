@@ -1,16 +1,26 @@
-﻿using System;
+﻿using ConsoleAppEF2.Database;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Dynamic.Core.CustomTypeProviders;
-using ConsoleAppEF2.Database;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 
 namespace ConsoleAppEF2
 {
     class Program
     {
+        class User
+        {
+            public string Name { get; set; }
+
+            public string GetDisplayName(bool a, bool b, bool c)
+            {
+                return Name + "GetDisplayName";
+            }
+        }
+
         class C : AbstractDynamicLinqCustomTypeProvider, IDynamicLinkCustomTypeProvider
         {
             public HashSet<Type> GetCustomTypes()
@@ -30,6 +40,12 @@ namespace ConsoleAppEF2
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
                 return ResolveType(assemblies, typeName);
+            }
+
+            public Type ResolveTypeBySimpleName(string typeName)
+            {
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                return ResolveTypeBySimpleName(assemblies, typeName);
             }
         }
 
@@ -69,6 +85,15 @@ namespace ConsoleAppEF2
             };
             Console.WriteLine("all {0}", JsonConvert.SerializeObject(all, Formatting.Indented));
 
+            var projects = new[]
+            {
+                new { UserShares = new [] { new User { Name  = "John" } } }
+            }.AsQueryable();
+
+            var filter = "UserShares.Any(GetDisplayName(true,true,false).Contains(\"John\"))";
+            var filtered = projects.Where(filter);
+            Console.WriteLine("filtered {0}", JsonConvert.SerializeObject(filtered, Formatting.Indented));
+
             var config = new ParsingConfig
             {
                 CustomTypeProvider = new C()
@@ -82,6 +107,21 @@ namespace ConsoleAppEF2
             context.Cars.Add(new Car { Brand = "Alfa", Color = "Black", Vin = "no", Year = "1979", DateLastModified = dateLastModified.AddDays(2) });
             context.Cars.Add(new Car { Brand = "Alfa", Color = "Black", Vin = "a%bc", Year = "1979", DateLastModified = dateLastModified.AddDays(3) });
             context.SaveChanges();
+
+            var methodTest = context.Cars.Select("it.X(true, \"tst\").Contains(\"Blue\")");
+            Console.WriteLine("methodTest {0}", JsonConvert.SerializeObject(methodTest, Formatting.Indented));
+
+            var carSingleOrDefault = context.Cars.SingleOrDefault(config, "Brand = \"Ford\"");
+            Console.WriteLine("carSingleOrDefault {0}", JsonConvert.SerializeObject(carSingleOrDefault, Formatting.Indented));
+
+            try
+            {
+                context.Cars.SingleOrDefault(config, "Brand = \"Alfa\"");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Excepted : " + e);
+            }
 
             var carDateLastModified = context.Cars.Where(config, "DateLastModified > \"2018-01-16\"");
             Console.WriteLine("carDateLastModified {0}", JsonConvert.SerializeObject(carDateLastModified, Formatting.Indented));

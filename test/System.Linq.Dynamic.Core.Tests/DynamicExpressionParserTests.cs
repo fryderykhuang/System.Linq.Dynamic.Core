@@ -112,6 +112,12 @@ namespace System.Linq.Dynamic.Core.Tests
             {
                 return Type.GetType(typeName);
             }
+
+            public Type ResolveTypeBySimpleName(string typeName)
+            {
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                return ResolveTypeBySimpleName(assemblies, typeName);
+            }
         }
 
         [Fact]
@@ -549,12 +555,10 @@ namespace System.Linq.Dynamic.Core.Tests
             };
 
             var context = new CustomClassWithStaticMethod();
-            string expression =
-                $"{nameof(CustomClassWithStaticMethod)}.{nameof(CustomClassWithStaticMethod.GetAge)}(10)";
+            string expression = $"{nameof(CustomClassWithStaticMethod)}.{nameof(CustomClassWithStaticMethod.GetAge)}(10)";
 
             // Act
-            var lambdaExpression =
-                DynamicExpressionParser.ParseLambda(config, typeof(CustomClassWithStaticMethod), null, expression);
+            var lambdaExpression = DynamicExpressionParser.ParseLambda(config, typeof(CustomClassWithStaticMethod), null, expression);
             Delegate del = lambdaExpression.Compile();
             int result = (int)del.DynamicInvoke(context);
 
@@ -565,12 +569,17 @@ namespace System.Linq.Dynamic.Core.Tests
         [Fact]
         public void DynamicExpressionParser_ParseLambda_With_InnerStringLiteral()
         {
-            var originalTrueValue = "simple + \"quoted\"";
-            var doubleQuotedTrueValue = "simple + \"\"quoted\"\"";
-            var expressionText = $"iif(1>0, \"{doubleQuotedTrueValue}\", \"false\")";
+            // Assign
+            string originalTrueValue = "simple + \"quoted\"";
+            string doubleQuotedTrueValue = "simple + \"\"quoted\"\"";
+            string expressionText = $"iif(1>0, \"{doubleQuotedTrueValue}\", \"false\")";
+
+            // Act
             var lambda = DynamicExpressionParser.ParseLambda(typeof(string), null, expressionText);
             var del = lambda.Compile();
             object result = del.DynamicInvoke(string.Empty);
+
+            // Assert
             Check.That(result).IsEqualTo(originalTrueValue);
         }
 

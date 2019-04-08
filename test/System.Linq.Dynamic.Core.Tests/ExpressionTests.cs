@@ -1,13 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json.Linq;
+using NFluent;
+using System.Collections.Generic;
 using System.Dynamic;
 using System.Globalization;
 using System.Linq.Dynamic.Core.Exceptions;
 using System.Linq.Dynamic.Core.Tests.Helpers;
 using System.Linq.Dynamic.Core.Tests.Helpers.Models;
-using System.Text;
-using Newtonsoft.Json.Linq;
 using Xunit;
-using NFluent;
 
 namespace System.Linq.Dynamic.Core.Tests
 {
@@ -28,6 +27,8 @@ namespace System.Linq.Dynamic.Core.Tests
             public TestEnum A { get; set; }
 
             public TestEnum2 B { get; set; }
+
+            public TestEnum2? C { get; set; }
 
             public int Id { get; set; }
         }
@@ -572,9 +573,6 @@ namespace System.Linq.Dynamic.Core.Tests
         public void ExpressionTests_Enum()
         {
             var config = new ParsingConfig();
-#if NETCOREAPP        
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
-#endif
 
             // Arrange
             var lst = new List<TestEnum> { TestEnum.Var1, TestEnum.Var2, TestEnum.Var3, TestEnum.Var4, TestEnum.Var5, TestEnum.Var6 };
@@ -590,8 +588,8 @@ namespace System.Linq.Dynamic.Core.Tests
             var resultEqualItLeft = qry.Where(config, "it = Var5");
             var resultEqualItRight = qry.Where(config, "Var5 = it");
 
-            var resultEqualEnumParamLeft = qry.Where(config, "@0 = it", TestEnum.Var5);
-            var resultEqualEnumParamRight = qry.Where(config, "it = @0", TestEnum.Var5);
+            var resultEqualEnumParamLeft = qry.Where("@0 = it", TestEnum.Var5);
+            var resultEqualEnumParamRight = qry.Where("it = @0", TestEnum.Var5);
 
             var resultEqualIntParamLeft = qry.Where("@0 = it", 8);
             var resultEqualIntParamRight = qry.Where("it = @0", 8);
@@ -626,12 +624,51 @@ namespace System.Linq.Dynamic.Core.Tests
         }
 
         [Fact]
-        public void ExpressionTests_ConfigExtensions()
+        public void ExpressionTests_Enum_Property()
+        {
+            // Arrange
+            var qry = new List<TestEnumClass> { new TestEnumClass { B = TestEnum2.Var2 } }.AsQueryable();
+
+            // Act
+            var resultEqualEnumParamLeft = qry.Where("@0 == it.B", TestEnum2.Var2).ToDynamicArray();
+            var resultEqualEnumParamRight = qry.Where("it.B == @0", TestEnum2.Var2).ToDynamicArray();
+
+            var resultEqualIntParamLeft = qry.Where("@0 == it.B", 1).ToDynamicArray();
+            var resultEqualIntParamRight = qry.Where("it.B == @0", 1).ToDynamicArray();
+
+            // Assert
+            Check.That(resultEqualEnumParamLeft.Single()).Equals(TestEnum2.Var2);
+            Check.That(resultEqualEnumParamRight.Single()).Equals(TestEnum2.Var2);
+
+            Check.That(resultEqualIntParamLeft.Single()).Equals(TestEnum2.Var2);
+            Check.That(resultEqualIntParamRight.Single()).Equals(TestEnum2.Var2);
+        }
+
+        [Fact]
+        public void ExpressionTests_Enum_NullableProperty()
+        {
+            // Arrange
+            var qry = new List<TestEnumClass> { new TestEnumClass { C = TestEnum2.Var2 } }.AsQueryable();
+
+            // Act
+            var resultEqualEnumParamLeft = qry.Where("@0 == it.C", TestEnum2.Var2).ToDynamicArray();
+            var resultEqualEnumParamRight = qry.Where("it.C == @0", TestEnum2.Var2).ToDynamicArray();
+
+            var resultEqualIntParamLeft = qry.Where("@0 == it.C", 1).ToDynamicArray();
+            var resultEqualIntParamRight = qry.Where("it.C == @0", 1).ToDynamicArray();
+
+            // Assert
+            Check.That(resultEqualEnumParamLeft.Single()).Equals(TestEnum2.Var2);
+            Check.That(resultEqualEnumParamRight.Single()).Equals(TestEnum2.Var2);
+
+            Check.That(resultEqualIntParamLeft.Single()).Equals(TestEnum2.Var2);
+            Check.That(resultEqualIntParamRight.Single()).Equals(TestEnum2.Var2);
+        }
+
+        [Fact]
+        public void ExpressionTests_Enum_MoreTests()
         {
             var config = new ParsingConfig();
-#if NETCOREAPP
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
-#endif
 
             // Arrange
             var lst = new List<TestEnum> { TestEnum.Var1, TestEnum.Var2, TestEnum.Var3, TestEnum.Var4, TestEnum.Var5, TestEnum.Var6 };
@@ -653,23 +690,18 @@ namespace System.Linq.Dynamic.Core.Tests
         [Fact]
         public void ExpressionTests_Enum_Nullable()
         {
-            var config = new ParsingConfig();
-#if NETSTANDARD
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
-#endif
-
             // Act
-            var result1a = new[] { TestEnum.Var1 }.AsQueryable().Where(config, "it = @0", (TestEnum?)TestEnum.Var1);
-            var result1b = new[] { TestEnum.Var1 }.AsQueryable().Where(config, "@0 = it", (TestEnum?)TestEnum.Var1);
-            var result2a = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where(config, "it = @0", TestEnum.Var1);
-            var result2b = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where(config, "@0 = it", TestEnum.Var1);
-            var result3a = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where(config, "it = @0", (TestEnum?)TestEnum.Var1);
-            var result3b = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where(config, "@0 = it", (TestEnum?)TestEnum.Var1);
+            var result1a = new[] { TestEnum.Var1 }.AsQueryable().Where("it = @0", (TestEnum?)TestEnum.Var1);
+            var result1b = new[] { TestEnum.Var1 }.AsQueryable().Where("@0 = it", (TestEnum?)TestEnum.Var1);
+            var result2a = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where("it = @0", TestEnum.Var1);
+            var result2b = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where("@0 = it", TestEnum.Var1);
+            var result3a = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where("it = @0", (TestEnum?)TestEnum.Var1);
+            var result3b = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where("@0 = it", (TestEnum?)TestEnum.Var1);
 
-            var result10a = new[] { TestEnum.Var1 }.AsQueryable().Where(config, "it = @0", "Var1");
-            var result10b = new[] { TestEnum.Var1 }.AsQueryable().Where(config, "@0 = it", "Var1");
-            var result11a = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where(config, "it = @0", "Var1");
-            var result11b = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where(config, "@0 = it", "Var1");
+            var result10a = new[] { TestEnum.Var1 }.AsQueryable().Where("it = @0", "Var1");
+            var result10b = new[] { TestEnum.Var1 }.AsQueryable().Where("@0 = it", "Var1");
+            var result11a = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where("it = @0", "Var1");
+            var result11b = new[] { (TestEnum?)TestEnum.Var1, null }.AsQueryable().Where("@0 = it", "Var1");
 
             // Assert
             Assert.Equal(TestEnum.Var1, result1a.Single());
@@ -744,7 +776,7 @@ namespace System.Linq.Dynamic.Core.Tests
         {
             var config = new ParsingConfig();
 #if NETSTANDARD
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
+            // config.CustomTypeProvider = new NetStandardCustomTypeProvider();
 #endif
 
             // Arrange
@@ -868,7 +900,7 @@ namespace System.Linq.Dynamic.Core.Tests
         {
             var config = new ParsingConfig();
 #if NETSTANDARD
-            config.CustomTypeProvider = new NetStandardCustomTypeProvider();
+            // config.CustomTypeProvider = new NetStandardCustomTypeProvider();
 #endif
             // Arrange
             var model1 = new ModelWithEnum { TestEnum = TestEnum.Var1 };
@@ -1257,57 +1289,48 @@ namespace System.Linq.Dynamic.Core.Tests
             Assert.Equal(expectedResult3, result3b.ToDynamicArray<int>());
         }
 
-        // [Fact]
-        public void ExpressionTests_NullPropagating()
+        [Fact]
+        public void ExpressionTests_NullPropagating_Null()
         {
             // Arrange
-            var testModels = User.GenerateSampleModels(1, true);
-            testModels[0].Profile = null;
-
-            string q = "Profile?.UserProfileDetails?.Id > 0 || Profile?.UserProfileDetails?.Id2 > 0";
-            string t = X(q);
+            var testModels = User.GenerateSampleModels(2, true).ToList();
+            testModels.Add(null); // Add null User
+            testModels[0].Profile = null; // Set the Profile to null for first User
 
             // Act
-            // (Profile != null ? (Profile.UserProfileDetails != null ? Profile.UserProfileDetails.Id : null) : null)
-            var result = testModels.AsQueryable().Where(t);
+            var result = testModels.AsQueryable().Select(t => t != null && t.Profile != null && t.Profile.UserProfileDetails != null ? (long?)t.Profile.UserProfileDetails.Id : null).ToArray();
+            var resultDynamic = testModels.AsQueryable().Select("np(it.Profile.UserProfileDetails.Id)").ToDynamicArray<long?>();
 
             // Assert
-            Check.That(result).IsNull();
+            Check.That(resultDynamic).ContainsExactly(result);
         }
 
-        private string X(string text)
+        [Fact]
+        public void ExpressionTests_NullPropagating_Value()
         {
-            var newText = new List<string>();
-            string[] spaceParts = text.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (string spacePart in spaceParts)
-            {
-                string[] parts = spacePart.Split(new[] { "?." }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 1)
-                {
-                    var list = new List<string>();
-                    for (int i = 0; i < parts.Length; i++)
-                    {
-                        list.Add(string.Join(".", parts.Take(parts.Length - i)));
-                    }
+            // Arrange
+            var testModels = User.GenerateSampleModels(2, true).ToList();
+            testModels.Add(null); // Add null User
+            testModels[0].Profile = null; // Set the Profile to null for first User
 
-                    var stringBuilder = new StringBuilder();
-                    list.Reverse();
-                    for (int i = 0; i < list.Count - 1; i++)
-                    {
-                        stringBuilder.Append($"({list[i]} != null ? ");
-                    }
+            // Act
+            var result = testModels.AsQueryable().Select(t => t != null && t.Profile != null && t.Profile.UserProfileDetails != null ? t.Profile.UserProfileDetails.Id : 100).ToArray();
+            var resultDynamic = testModels.AsQueryable().Select("np(it.Profile.UserProfileDetails.Id, 100)").ToDynamicArray<long>();
 
-                    stringBuilder.Append($"({list.Last()}) {string.Concat(Enumerable.Repeat(" : null)", parts.Length - 1))}");
+            // Assert
+            Check.That(resultDynamic).ContainsExactly(result);
+        }
 
-                    newText.Add(stringBuilder.ToString());
-                }
-                else
-                {
-                    newText.Add(spacePart);
-                }
-            }
+        [Fact]
+        public void ExpressionTests_NullPropagating_ThrowsException()
+        {
+            // Arrange
+            var q = User.GenerateSampleModels(1, true).AsQueryable();
 
-            return string.Join(" ", newText);
+            // Act
+            Check.ThatCode(() => q.Select("np()")).Throws<ParseException>();
+            Check.ThatCode(() => q.Select("np(it.Profile.UserProfileDetails.Id, 1, 2)")).Throws<ParseException>();
+            Check.ThatCode(() => q.Select("np(1)")).Throws<ParseException>();
         }
 
         [Fact]
@@ -1339,7 +1362,7 @@ namespace System.Linq.Dynamic.Core.Tests
             Assert.Equal(new[] { 100, 200 }, result.ToDynamicArray<int>());
         }
 
-#if !NETCOREAPP1_1
+#if !NETCOREAPP
         [Fact]
         [Trait("Issue", "136")]
         public void ExpressionTests_Select_ExpandoObjects()
