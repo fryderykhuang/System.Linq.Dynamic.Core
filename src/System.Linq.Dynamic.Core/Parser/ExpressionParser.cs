@@ -10,6 +10,7 @@ using System.Linq.Dynamic.Core.Tokenizer;
 using System.Linq.Dynamic.Core.Validation;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace System.Linq.Dynamic.Core.Parser
 {
@@ -774,7 +775,10 @@ namespace System.Linq.Dynamic.Core.Parser
                 _textParser.NextToken();
                 return ConstantExpressionHelper.CreateLiteral(s[0], s);
             }
+
             _textParser.NextToken();
+
+            s = Regex.Unescape(s);
             return ConstantExpressionHelper.CreateLiteral(s, s);
         }
 
