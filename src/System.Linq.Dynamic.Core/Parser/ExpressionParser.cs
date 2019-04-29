@@ -1197,21 +1197,37 @@ namespace System.Linq.Dynamic.Core.Parser
                     // If expr1 is a null constant and expr2 is a IsValueType:
                     // - create nullable constant from expr1 with type from expr2
                     // - convert expr2 to nullable
-                    if (expr1 == Constants.NullLiteral && expr2.Type.GetTypeInfo().IsValueType)
+                    var expr2Type = expr2.Type.GetTypeInfo();
+                    if (expr1 == Constants.NullLiteral && expr2Type.IsValueType)
                     {
-                        Type nullableType = typeof(Nullable<>).MakeGenericType(expr2.Type);
-                        expr1 = Expression.Constant(null, nullableType);
-                        expr2 = Expression.Convert(expr2, nullableType);
+                        if (!expr2Type.IsGenericType || expr2Type.GetGenericTypeDefinition() != typeof(Nullable<>))
+                        {
+                            Type nullableType = typeof(Nullable<>).MakeGenericType(expr2.Type);
+                            expr1 = Expression.Constant(null, nullableType);
+                            expr2 = Expression.Convert(expr2, nullableType);
+                        }
+                        else
+                        {
+                            expr1 = Expression.Constant(null, expr2.Type);
+                        }
                     }
 
                     // If expr2 is a null constant and expr1 is a IsValueType:
                     // - create nullable constant from expr2 with type from expr1
                     // - convert expr1 to nullable
-                    if (expr2 == Constants.NullLiteral && expr1.Type.GetTypeInfo().IsValueType)
+                    var expr1Type = expr1.Type.GetTypeInfo();
+                    if (expr2 == Constants.NullLiteral && expr1Type.IsValueType)
                     {
-                        Type nullableType = typeof(Nullable<>).MakeGenericType(expr1.Type);
-                        expr2 = Expression.Constant(null, nullableType);
-                        expr1 = Expression.Convert(expr1, nullableType);
+                        if (!expr1Type.IsGenericType || expr1Type.GetGenericTypeDefinition() != typeof(Nullable<>))
+                        {
+                            Type nullableType = typeof(Nullable<>).MakeGenericType(expr1.Type);
+                            expr2 = Expression.Constant(null, nullableType);
+                            expr1 = Expression.Convert(expr1, nullableType);
+                        }
+                        else
+                        {
+                            expr2 = Expression.Constant(null, expr1.Type);
+                        }
                     }
 
                     return Expression.Condition(test, expr1, expr2);
